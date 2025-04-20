@@ -8,43 +8,45 @@ st.caption("Serious. Delicious. Transparent.")
 
 wallet = "0xA36D2861E036b897bA6C6E3448d123Ec25FA451A"
 
-# -- Blockscout API (Stable) --
-def fetch_blockscout_tokens(wallet_address):
-    url = f"https://gnosisscan.io/api?module=account&action=tokenlist&address={wallet_address}"
+# -- CoinGecko API integration for token prices --
+def fetch_coingecko_token_prices():
+    url = "https://api.coingecko.com/api/v3/coins/markets"
+    params = {
+        "vs_currency": "usd",
+        "order": "market_cap_desc",
+        "per_page": 10,
+        "page": 1,
+        "sparkline": False
+    }
     try:
-        response = requests.get(url, timeout=5)
-        result = response.json()
-        tokens = result.get("result", [])
-
-        if not isinstance(tokens, list):
-            st.error(f"Unexpected response from Blockscout:\n{tokens}")
-            return pd.DataFrame()
-
+        response = requests.get(url, params=params, timeout=5)
+        data = response.json()
         df = pd.DataFrame([{
-            "name": t.get("name"),
-            "symbol": t.get("symbol"),
-            "balance": float(t.get("balance")) / 10**int(t.get("decimals", 18)),
-            "value_usd": float(t.get("quote", 0.0))
-        } for t in tokens])
+            "name": coin.get("name"),
+            "symbol": coin.get("symbol"),
+            "current_price": coin.get("current_price"),
+            "market_cap": coin.get("market_cap"),
+            "total_volume": coin.get("total_volume")
+        } for coin in data])
         return df
     except Exception as e:
-        st.error(f"Blockscout API Error: {e}")
+        st.error(f"CoinGecko API Error: {e}")
         return pd.DataFrame()
 
-tokens_df = fetch_blockscout_tokens(wallet)
+# Load data
+tokens_df = fetch_coingecko_token_prices()
+
+# Display
+total_value = tokens_df["current_price"].sum() if not tokens_df.empty else 0
 
 if tokens_df.empty:
-    st.warning("No token data found or unable to fetch from Blockscout.")
+    st.warning("No token data found or unable to fetch from CoinGecko.")
 else:
-    st.subheader("💰 Token Holdings")
+    st.subheader("💰 Top Tokens by Market Cap (via CoinGecko)")
     st.dataframe(tokens_df)
 
-    if st.button("📥 Export Tokens as CSV"):
-        tokens_df.to_csv("tokens_export.csv", index=False)
-        st.success("Tokens exported!")
+    if st.button("📥 Export Token Prices as CSV"):
+        tokens_df.to_csv("coingecko_tokens_export.csv", index=False)
+        st.success("Token prices exported!")
 
-    if "value_usd" in tokens_df.columns:
-        total_value = tokens_df["value_usd"].sum()
-        st.metric("📈 Total Value (USD)", f"${total_value:,.2f}")
-    else:
-        st.info("No USD values available in the data.")
+    st.metric("📈 Combined Current Price Sum", f"${total_value:,.2f}")

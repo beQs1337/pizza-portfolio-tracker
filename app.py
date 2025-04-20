@@ -1,52 +1,29 @@
 import streamlit as st
-import pandas as pd
-import requests
+from portfolio_logic import fetch_pepuscan_tokens
+from PIL import Image
+import time
 
 st.set_page_config(page_title="🍕 PizzaDay Portfolio Tracker", layout="wide")
+
+# --- Intro Animation ---
+st.markdown("## 🍕 Welcome to PizzaDay Tracker!")
+st.image("assets/pizza_intro.gif", use_column_width=True)
+time.sleep(2)  # Show effect pause
+st.markdown("---")
+
+# --- App Content ---
 st.title("📊 PizzaDay Portfolio Tracker")
-st.caption("Serious. Delicious. Transparent.")
+st.caption("Live from PEPU — Serious. Delicious. On-Chain.")
 
-wallet = "0xA36D2861E036b897bA6C6E3448d123Ec25FA451A"
+wallet_address = "0x97Cc38a7aa6DF2352830a3Dd228047d5FaC597fa"
+df = fetch_pepuscan_tokens(wallet_address)
 
-# -- CoinGecko API integration for token prices --
-def fetch_coingecko_token_prices():
-    url = "https://api.coingecko.com/api/v3/coins/markets"
-    params = {
-        "vs_currency": "usd",
-        "order": "market_cap_desc",
-        "per_page": 10,
-        "page": 1,
-        "sparkline": False
-    }
-    try:
-        response = requests.get(url, params=params, timeout=5)
-        data = response.json()
-        df = pd.DataFrame([{
-            "name": coin.get("name"),
-            "symbol": coin.get("symbol"),
-            "current_price": coin.get("current_price"),
-            "market_cap": coin.get("market_cap"),
-            "total_volume": coin.get("total_volume")
-        } for coin in data])
-        return df
-    except Exception as e:
-        st.error(f"CoinGecko API Error: {e}")
-        return pd.DataFrame()
-
-# Load data
-tokens_df = fetch_coingecko_token_prices()
-
-# Display
-total_value = tokens_df["current_price"].sum() if not tokens_df.empty else 0
-
-if tokens_df.empty:
-    st.warning("No token data found or unable to fetch from CoinGecko.")
+if df.empty:
+    st.warning("No tokens found or API unavailable.")
 else:
-    st.subheader("💰 Top Tokens by Market Cap (via CoinGecko)")
-    st.dataframe(tokens_df)
+    st.subheader("💰 Live Wallet Tokens (PepuScan)")
+    st.dataframe(df)
 
-    if st.button("📥 Export Token Prices as CSV"):
-        tokens_df.to_csv("coingecko_tokens_export.csv", index=False)
-        st.success("Token prices exported!")
-
-    st.metric("📈 Combined Current Price Sum", f"${total_value:,.2f}")
+    if st.button("📥 Export as CSV"):
+        df.to_csv("pepuscan_tokens_export.csv", index=False)
+        st.success("Exported successfully!")

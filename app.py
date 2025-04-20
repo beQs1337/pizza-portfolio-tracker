@@ -8,26 +8,16 @@ st.caption("Serious. Delicious. Transparent.")
 
 wallet = "0xA36D2861E036b897bA6C6E3448d123Ec25FA451A"
 
-# -- PepuScan API (Primary) --
-def fetch_pepuscan_tokens(wallet_address):
-    url = f"https://api.pepuscan.com/portfolio?wallet={wallet_address}"
-    try:
-        response = requests.get(url, timeout=5)
-        result = response.json()
-        tokens = result.get("tokens", [])
-        return pd.DataFrame(tokens)
-    except Exception as e:
-        st.warning(f"PepuScan API failed. Falling back to Blockscout.\n\n{e}")
-        return None
-
-# -- Blockscout API (Fallback) --
+# -- Blockscout API (Stable) --
 def fetch_blockscout_tokens(wallet_address):
     url = f"https://gnosisscan.io/api?module=account&action=tokenlist&address={wallet_address}"
     try:
         response = requests.get(url, timeout=5)
         result = response.json()
         tokens = result.get("result", [])
-        if not tokens:
+
+        if not isinstance(tokens, list):
+            st.error(f"Unexpected response from Blockscout:\n{tokens}")
             return pd.DataFrame()
 
         df = pd.DataFrame([{
@@ -41,14 +31,10 @@ def fetch_blockscout_tokens(wallet_address):
         st.error(f"Blockscout API Error: {e}")
         return pd.DataFrame()
 
-# -- Try PepuScan first, fallback to Blockscout --
-tokens_df = fetch_pepuscan_tokens(wallet)
-if tokens_df is None or tokens_df.empty:
-    tokens_df = fetch_blockscout_tokens(wallet)
+tokens_df = fetch_blockscout_tokens(wallet)
 
-# -- Show result --
 if tokens_df.empty:
-    st.error("No token data found from either source.")
+    st.warning("No token data found or unable to fetch from Blockscout.")
 else:
     st.subheader("💰 Token Holdings")
     st.dataframe(tokens_df)
